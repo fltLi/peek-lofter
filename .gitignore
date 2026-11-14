@@ -31,3 +31,8 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# peek-lofter local outputs
+/tmp-*/
+/peek-out/
+/dist/

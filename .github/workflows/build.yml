@@ -1,0 +1,55 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    env:
+      GITHUB_BUILD_SHA: ${{ github.event.pull_request && github.event.pull_request.head.sha || github.sha }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
+          echo "value=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build
+        run: go build -ldflags "-X github.com/fltLi/peek-lofter/pkg/version.Version=${{ steps.version.outputs.value }} -X github.com/fltLi/peek-lofter/pkg/version.Commit=${{ env.GITHUB_BUILD_SHA }}" -o peek-lofter${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./cmd/peek-lofter
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: peek-lofter-${{ matrix.os }}
+          path: peek-lofter${{ matrix.os == 'windows-latest' && '.exe' || '' }}
